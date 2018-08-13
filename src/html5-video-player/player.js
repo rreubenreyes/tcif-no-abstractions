@@ -10,16 +10,16 @@ const playbackSlider = player.querySelector('[name="playbackRate"]')
 
 /* inspector */
 const inspector = {
-  currentItem: document.querySelector('.inspector__current-item'),
-  log: [],
-  target: document.querySelector('.inspector__window'),
   clearButton: document.querySelector('.inspector__button--clear'),
-  modeButton: document.querySelector('.inspector__button--inspector'),
-  inspecting: '',
+  currentFocus: null,
+  currentFocusName: document.querySelector('.inspector__current-item'),
   inspectorMode: false,
-  clearInspectedItem() {
+  log: [],
+  modeButton: document.querySelector('.inspector__button--inspector'),
+  target: document.querySelector('.inspector__window'),
+  clearFocus() {
     this.target.innerHTML = ''
-    this.inspect('')
+    this.setFocus(null)
   },
   colorize(string, payload = null) {
     if (!payload) return string
@@ -29,23 +29,23 @@ const inspector = {
     )
     return colorized
   },
-  inspect(item) {
-    this.inspecting = item === '' ? item : item.name
-    this.currentItem.innerHTML = item === '' ? '[All]' : item.name
+  expose(string, payload = null) {
+    this.target.innerHTML = ''
+    this.log.push({ name: payload.name, string: this.colorize(string, payload) })
     this.refresh()
   },
   refresh() {
     this.target.innerHTML = ''
     this.log.forEach((line) => {
-      if (line.string.includes(this.inspecting)) {
+      if (line.string.includes(this.currentFocus)) {
         this.target.innerHTML += `${line.string}<br>`
       }
     })
     this.target.scrollTop = this.target.scrollHeight - this.target.offsetHeight
   },
-  write(string, payload = null) {
-    this.target.innerHTML = ''
-    this.log.push({ name: payload.name, string: this.colorize(string, payload) })
+  setFocus(item) {
+    this.currentFocus = item ? item.name : ''
+    this.currentFocusName.innerHTML = item ? item.name : '[All]'
     this.refresh()
   },
 }
@@ -53,26 +53,26 @@ const inspector = {
 /* assign handlers */
 function handleInspectorModeToggle() {
   this.classList.toggle('off')
-  inspector.inspecting = ''
+  inspector.currentFocus = ''
   inspector.inspectorMode = !inspector.inspectorMode
 }
 function handlePlayPause() {
   if (inspector.inspectorMode) {
-    inspector.inspect(PL_VIEWER)
+    inspector.setFocus(PL_VIEWER)
     return
   }
   const method = viewer.paused ? 'play' : 'pause'
   viewer[method]()
   this.innerHTML = viewer.paused ? '►' : 'II'
-  inspector.write(`viewer.${method}()`, PL_VIEWER)
+  inspector.expose(`viewer.${method}()`, PL_VIEWER)
 }
 function handleProgressChange() {
   progress.style.flexBasis = `${(viewer.currentTime / viewer.duration) * 100}%`
 }
 function handleSkip() {
   viewer.currentTime += parseFloat(this.dataset.skip)
-  inspector.write(`viewer.currentTime += ${this.dataset.skip}`, PL_VIEWER)
-  inspector.write(
+  inspector.expose(`viewer.currentTime += ${this.dataset.skip}`, PL_VIEWER)
+  inspector.expose(
     `progressBar.style.flexBasis = "${(viewer.currentTime / viewer.duration) * 100}%"`,
     PL_PROGRESS,
   )
@@ -93,7 +93,7 @@ let canScrub = false
 
 /* RENDER */
 inspector.target.style.flexBasis = `${player.offsetHeight}px`
-inspector.inspect('')
+inspector.setFocus('')
 
 /* listeners */
 /* buttons */
@@ -106,17 +106,17 @@ skipButtons.forEach((button) => {
 /* sliders */
 playbackSlider.addEventListener('input', (e) => {
   viewer.playbackRate = e.target.value
-  inspector.write(`viewer.playbackRate = ${viewer.playbackRate}`, PL_VIEWER)
+  inspector.expose(`viewer.playbackRate = ${viewer.playbackRate}`, PL_VIEWER)
 })
 volumeSlider.addEventListener('input', (e) => {
   viewer.volume = e.target.value
-  inspector.write(`viewer.volume = ${viewer.volume}`, PL_VIEWER)
+  inspector.expose(`viewer.volume = ${viewer.volume}`, PL_VIEWER)
 })
 
 /* progress bar */
 viewer.addEventListener('timeupdate', handleProgressChange)
 progressBar.addEventListener('mousedown', () => {
-  if (inspector.inspectorMode) inspector.inspect(PL_PROGRESS)
+  if (inspector.inspectorMode) inspector.setFocus(PL_PROGRESS)
   canScrub = true
 })
 progressBar.addEventListener('mousemove', (e) => {
@@ -124,8 +124,8 @@ progressBar.addEventListener('mousemove', (e) => {
 })
 progressBar.addEventListener('mouseup', (e) => {
   handleScrub.call(progressBar, e)
-  inspector.write(`viewer.currentTime = ${viewer.currentTime}s`, PL_VIEWER)
-  inspector.write(
+  inspector.expose(`viewer.currentTime = ${viewer.currentTime}s`, PL_VIEWER)
+  inspector.expose(
     `progressBar.style.flexBasis = "${(viewer.currentTime / viewer.duration) * 100}%"`,
     PL_PROGRESS,
   )
@@ -135,5 +135,5 @@ progressBar.addEventListener('mouseup', (e) => {
 /* inspector */
 inspector.modeButton.addEventListener('click', handleInspectorModeToggle)
 inspector.clearButton.addEventListener('click', () => {
-  inspector.clearInspectedItem()
+  inspector.clearFocus()
 })
