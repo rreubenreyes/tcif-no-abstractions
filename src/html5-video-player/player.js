@@ -1,4 +1,5 @@
 /* eslint-disable no-use-before-define */
+/* eslint-disable no-underscore-dangle */
 /* player elements */
 const player = document.querySelector('.player')
 const viewer = player.querySelector('.viewer')
@@ -16,7 +17,18 @@ const inspector = {
   inspectorMode: false,
   log: [],
   modeButton: document.querySelector('.inspector__button--inspector'),
+  payloads: { initialized: false },
   target: document.querySelector('.inspector__window'),
+  wrapper: document.querySelector('.inspector'),
+  _mount() {
+    this.clearButton.addEventListener('click', this.clearFocus.bind(this))
+    this.modeButton.addEventListener('click', this.toggleInspectorMode.bind(this))
+    this.setFocus('')
+    this._render()
+  },
+  _render() {
+    this.wrapper.style.height = `${player.offsetHeight}px`
+  },
   clearFocus() {
     this.target.innerHTML = ''
     this.setFocus(null)
@@ -30,15 +42,19 @@ const inspector = {
     return colorized
   },
   expose(string, payload = null) {
-    this.target.innerHTML = ''
-    this.log.push({ name: payload.name, string: this.colorize(string, payload) })
-    this.refresh()
+    if (!this.inspectorMode) {
+      this.target.innerHTML = ''
+      this.log.push({ name: payload.name, string: this.colorize(string, payload) })
+      this.refresh()
+    }
   },
   refresh() {
     this.target.innerHTML = ''
-    this.log.forEach((line) => {
+    this.log.forEach((line, index) => {
       if (line.string.includes(this.currentFocus)) {
-        this.target.innerHTML += `${line.string}<br>`
+        this.target.innerHTML += `<span style="display:inline-block;background:var(--solid-gray);font-size:1.5rem;padding:.25rem .5rem;text-align:right;width:3.25rem;">${index}</span> ${
+          line.string
+        }<br>`
       }
     })
     this.target.scrollTop = this.target.scrollHeight - this.target.offsetHeight
@@ -48,14 +64,13 @@ const inspector = {
     this.currentFocusName.innerHTML = item ? item.name : '[All]'
     this.refresh()
   },
+  toggleInspectorMode() {
+    this.modeButton.classList.toggle('off')
+    this.inspectorMode = !this.inspectorMode
+  },
 }
 
 /* assign handlers */
-function handleInspectorModeToggle() {
-  this.classList.toggle('off')
-  inspector.currentFocus = ''
-  inspector.inspectorMode = !inspector.inspectorMode
-}
 function handlePlayPause() {
   if (inspector.inspectorMode) {
     inspector.setFocus(PL_VIEWER)
@@ -64,16 +79,18 @@ function handlePlayPause() {
   const method = viewer.paused ? 'play' : 'pause'
   viewer[method]()
   this.innerHTML = viewer.paused ? '►' : 'II'
+  inspector.expose(`playButton.innerHTML = ${viewer.paused ? '►' : 'II'}`, PL_PLAY_BUTTON)
   inspector.expose(`viewer.${method}()`, PL_VIEWER)
 }
 function handleProgressChange() {
   progress.style.flexBasis = `${(viewer.currentTime / viewer.duration) * 100}%`
 }
 function handleSkip() {
+  if (inspector.inspectorMode) return
   viewer.currentTime += parseFloat(this.dataset.skip)
   inspector.expose(`viewer.currentTime += ${this.dataset.skip}`, PL_VIEWER)
   inspector.expose(
-    `progressBar.style.flexBasis = "${(viewer.currentTime / viewer.duration) * 100}%"`,
+    `progressBar.style.flexBasis = "${(viewer.currentTime / viewer.duration).toFixed(2) * 100}%"`,
     PL_PROGRESS,
   )
   handleProgressChange()
@@ -86,14 +103,17 @@ function handleScrub(e) {
 
 /* constants */
 const PL_VIEWER = { name: 'viewer', regex: /viewer/gi, color: 'var(--solid-blue)' }
+const PL_PLAY_BUTTON = { name: 'playButton', regex: /playButton/gi, color: 'var(--solid-orange)' }
 const PL_PROGRESS = { name: 'progressBar', regex: /progressBar/gi, color: 'var(--solid-green)' }
+const PL_VOLUME = { name: 'volumeSlider', regex: /volumeSlider/gi, color: 'var(--solid-goldenrod)' }
+const PL_PLAYBACK = {
+  name: 'playbackRateSlider',
+  regex: /playbackRateSlider/gi,
+  color: 'var(--solid-pink)',
+}
 
 /* state variables */
 let canScrub = false
-
-/* RENDER */
-inspector.target.style.flexBasis = `${player.offsetHeight}px`
-inspector.setFocus('')
 
 /* listeners */
 /* buttons */
@@ -106,34 +126,48 @@ skipButtons.forEach((button) => {
 /* sliders */
 playbackSlider.addEventListener('input', (e) => {
   viewer.playbackRate = e.target.value
+  inspector.expose(`playbackRateSlider.value = ${e.target.value}`, PL_PLAYBACK)
   inspector.expose(`viewer.playbackRate = ${viewer.playbackRate}`, PL_VIEWER)
+})
+playbackSlider.addEventListener('click', () => {
+  if (inspector.inspectorMode) inspector.setFocus(PL_PLAYBACK)
 })
 volumeSlider.addEventListener('input', (e) => {
   viewer.volume = e.target.value
+  inspector.expose(`volumeSlider.value = ${e.target.value}`, PL_VOLUME)
   inspector.expose(`viewer.volume = ${viewer.volume}`, PL_VIEWER)
+})
+volumeSlider.addEventListener('click', () => {
+  if (inspector.inspectorMode) inspector.setFocus(PL_VOLUME)
 })
 
 /* progress bar */
 viewer.addEventListener('timeupdate', handleProgressChange)
 progressBar.addEventListener('mousedown', () => {
   if (inspector.inspectorMode) inspector.setFocus(PL_PROGRESS)
-  canScrub = true
+  else {
+    canScrub = true
+  }
 })
 progressBar.addEventListener('mousemove', (e) => {
   if (canScrub) handleScrub.call(progressBar, e)
 })
 progressBar.addEventListener('mouseup', (e) => {
-  handleScrub.call(progressBar, e)
-  inspector.expose(`viewer.currentTime = ${viewer.currentTime}s`, PL_VIEWER)
-  inspector.expose(
-    `progressBar.style.flexBasis = "${(viewer.currentTime / viewer.duration) * 100}%"`,
-    PL_PROGRESS,
-  )
-  canScrub = false
+  if (canScrub) {
+    handleScrub.call(progressBar, e)
+    inspector.expose(`viewer.currentTime = ${viewer.currentTime.toFixed(2)}s`, PL_VIEWER)
+    inspector.expose(
+      `progressBar.style.flexBasis = "${(viewer.currentTime / viewer.duration).toFixed(2) * 100}%"`,
+      PL_PROGRESS,
+    )
+    canScrub = false
+  }
 })
 
-/* inspector */
-inspector.modeButton.addEventListener('click', handleInspectorModeToggle)
-inspector.clearButton.addEventListener('click', () => {
-  inspector.clearFocus()
-})
+/* RENDER */
+window.onload = () => {
+  inspector._mount()
+}
+window.onresize = () => {
+  inspector._render()
+}
