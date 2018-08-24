@@ -1,0 +1,30 @@
+{
+  "env": {
+    "browser": true,
+    "es6": true,
+    "jquery": true,
+    "node": true
+  },
+  "extends": ["airbnb"],
+  "parser": "babel-eslint",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "experimentalObjectRestSpread": true,
+      "jsx": true
+    },
+    "sourceType": "module"
+  },
+  "plugins": ["graphql"],
+  "rules": {
+    "linebreak-style": ["error", "unix"],
+    "max-len": ["error", { "code": 120 }],
+    "no-constant-condition": "warn",
+    "no-unused-vars": "warn",
+    "quotes": ["error", "backtick", { "allowTemplateLiterals": true }],
+    "react/destructuring-assignment": ["enabled", "never"],
+    "react/forbid-prop-types": ["enabled", "never"],
+    "react/jsx-filename-extension": [1, { "extensions": [".js", ".jsx"] }],
+    "react/jsx-uses-vars": [2],
+    "semi": ["error", "never"]
+  }
+}
